@@ -9,7 +9,12 @@ from PIL import Image, ImageDraw, ImageFont
 IMAGES_DIR = os.path.join("assets", "images")
 OUTPUT_PATH = os.path.join("assets", "video", "thumbnail.jpg")
 
-# YouTube recommended thumbnail size
+# YouTube recommended thumbnail sizes
+THUMB_SIZES = {
+    "landscape": (1280, 720),   # 16:9 for regular videos
+    "portrait": (720, 1280),    # 9:16 for Shorts
+}
+
 THUMB_WIDTH = 1280
 THUMB_HEIGHT = 720
 
@@ -18,12 +23,15 @@ def create_thumbnail(
     title: str,
     image_path: str = None,
     output_path: str = OUTPUT_PATH,
+    format_type: str = "landscape",
 ) -> str:
     """
     Generate a YouTube thumbnail:
     1. Load background image (first downloaded image by default)
     2. Apply dark overlay for text contrast
     3. Draw bold title text centered on the image
+
+    format_type: "landscape" or "portrait" (for Shorts)
     """
     # Pick background image
     if image_path is None:
@@ -32,9 +40,12 @@ def create_thumbnail(
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image not found: {image_path}")
 
+    # Get thumbnail dimensions based on format
+    thumb_width, thumb_height = THUMB_SIZES.get(format_type, THUMB_SIZES["landscape"])
+
     # Open and resize to thumbnail dimensions
     img = Image.open(image_path).convert("RGB")
-    img = img.resize((THUMB_WIDTH, THUMB_HEIGHT), Image.LANCZOS)
+    img = img.resize((thumb_width, thumb_height), Image.LANCZOS)
 
     # Apply semi-transparent dark overlay for contrast
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 140))
@@ -58,7 +69,7 @@ def create_thumbnail(
         font = ImageFont.load_default()
 
     # Word-wrap the title text
-    max_chars_per_line = 25
+    max_chars_per_line = 25 if format_type == "landscape" else 15
     words = title.upper().split()
     lines = []
     current_line = ""
@@ -79,13 +90,13 @@ def create_thumbnail(
         line_heights.append(bbox[3] - bbox[1])
 
     total_text_height = sum(line_heights) + (len(lines) - 1) * 15  # 15px line spacing
-    y_start = (THUMB_HEIGHT - total_text_height) // 2
+    y_start = (thumb_height - total_text_height) // 2
 
     # Draw each line centered with a shadow effect
     for i, line in enumerate(lines):
         bbox = draw.textbbox((0, 0), line, font=font)
         text_width = bbox[2] - bbox[0]
-        x = (THUMB_WIDTH - text_width) // 2
+        x = (thumb_width - text_width) // 2
         y = y_start + sum(line_heights[:i]) + i * 15
 
         # Shadow

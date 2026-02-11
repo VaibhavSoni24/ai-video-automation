@@ -29,19 +29,70 @@ from scripts.make_video import create_video
 from scripts.subtitles import generate_srt, burn_subtitles
 from scripts.thumbnail import create_thumbnail
 from scripts.upload_youtube import upload_video
+import glob
 
 
-def run_pipeline(topic: str, upload: bool = False):
+def cleanup_generated_files(final_video: str = None):
+    """Delete all generated files (images, audio, script, etc.) keeping only the final video."""
+    print("\n[Cleanup] Removing generated files...")
+
+    # Remove images
+    images_dir = os.path.join("assets", "images")
+    if os.path.exists(images_dir):
+        for file in glob.glob(os.path.join(images_dir, "*.jpg")):
+            os.remove(file)
+            print(f"  Deleted {file}")
+
+    # Remove audio
+    audio_file = os.path.join("assets", "audio", "voice.mp3")
+    if os.path.exists(audio_file):
+        os.remove(audio_file)
+        print(f"  Deleted {audio_file}")
+
+    # Remove script
+    if os.path.exists("script.txt"):
+        os.remove("script.txt")
+        print("  Deleted script.txt")
+
+    # Remove SRT subtitles
+    srt_file = os.path.join("assets", "audio", "voice.srt")
+    if os.path.exists(srt_file):
+        os.remove(srt_file)
+        print(f"  Deleted {srt_file}")
+
+    # Remove intermediate video (without subtitles) and thumbnail, keep final video
+    video_dir = os.path.join("assets", "video")
+    if os.path.exists(video_dir):
+        for file in glob.glob(os.path.join(video_dir, "*.mp4")):
+            if final_video and os.path.abspath(file) == os.path.abspath(final_video):
+                continue  # Keep the final video
+            os.remove(file)
+            print(f"  Deleted {file}")
+        for file in glob.glob(os.path.join(video_dir, "*.jpg")):
+            os.remove(file)
+            print(f"  Deleted {file}")
+
+    print("[Cleanup] Done.")
+
+
+def run_pipeline(
+    topic: str,
+    upload: bool = False,
+    format_type: str = "landscape",
+    privacy: str = "private",
+):
     """Execute the full video-generation pipeline."""
 
     print("=" * 60)
     print(f"  AI VIDEO PIPELINE")
     print(f"  Topic: {topic}")
+    print(f"  Format: {format_type.upper()} ({'Shorts' if format_type == 'portrait' else 'Video'})")
+    print(f"  Privacy: {privacy.upper()}")
     print("=" * 60)
 
     # ── Step 1: Generate Script ──────────────────────────────────────
     print("\n[Step 1/8] Generating script...")
-    script_text = generate_script(topic)
+    script_text = generate_script(topic, format_type=format_type)
 
     # Save script to file
     with open("script.txt", "w", encoding="utf-8") as f:
@@ -76,7 +127,7 @@ def run_pipeline(topic: str, upload: bool = False):
 
     # ── Step 6: Create Video ─────────────────────────────────────────
     print("\n[Step 6/8] Creating video...")
-    video_path = create_video()
+    video_path = create_video(format_type=format_type)
 
     # ── Step 7: Subtitles ────────────────────────────────────────────
     print("\n[Step 7/8] Generating subtitles...")
@@ -88,17 +139,22 @@ def run_pipeline(topic: str, upload: bool = False):
         print("  Continuing without subtitles...")
         final_video = video_path
 
-    # ── Step 7b: Generate Thumbnail ──────────────────────────────────
-    print("\n[Step 7b] Creating thumbnail...")
-    try:
-        thumbnail_path = create_thumbnail(metadata["title"])
-    except Exception as e:
-        print(f"  Thumbnail generation failed: {e}")
-        thumbnail_path = None
+    # ── Step 7b: Generate Thumbnail (skip for Shorts) ────────────────
+    thumbnail_path = None
+    if format_type == "landscape":
+        print("\n[Step 7b] Creating thumbnail...")
+        try:
+            thumbnail_path = create_thumbnail(metadata["title"], format_type=format_type)
+        except Exception as e:
+            print(f"  Thumbnail generation failed: {e}")
+            thumbnail_path = None
+    else:
+        print("\n[Step 7b] Skipping thumbnail (not needed for Shorts).")
 
     # ── Step 8: Upload to YouTube (optional) ─────────────────────────
     if upload:
-        print("\n[Step 8/8] Uploading to YouTube...")
+        is_short = (format_type == "portrait")
+        print(f"\n[Step 8/8] Uploading to YouTube {'Shorts' if is_short else ''}...")
         try:
             video_id = upload_video(
                 video_path=final_video,
@@ -106,13 +162,18 @@ def run_pipeline(topic: str, upload: bool = False):
                 description=metadata["description"],
                 tags=metadata["tags"],
                 thumbnail_path=thumbnail_path,
+                privacy=privacy,
+                is_short=is_short,
             )
             print(f"\n  YouTube URL: https://youtube.com/watch?v={video_id}")
         except Exception as e:
             print(f"  Upload failed: {e}")
             print("  Video saved locally — you can upload manually.")
     else:
-        print("\n[Step 8/8] Skipping upload (use --upload flag to enable).")
+        print("\n[Step 8/8] Skipping upload.")
+
+    # ── Cleanup (always, keep final video) ─────────────────────────
+    cleanup_generated_files(final_video=final_video)
 
     # ── Done ─────────────────────────────────────────────────────────
     print("\n" + "=" * 60)
@@ -127,16 +188,25 @@ def run_pipeline(topic: str, upload: bool = False):
 if __name__ == "__main__":
     # ── Get topic from CLI args or prompt ────────────────────────────
     if len(sys.argv) > 1:
-        # Support: python main.py "topic here" [--upload]
-        upload_flag = "--upload" in sys.argv
         args = [a for a in sys.argv[1:] if a != "--upload"]
         TOPIC = " ".join(args)
     else:
         TOPIC = input("Enter video topic: ").strip()
-        upload_flag = input("Upload to YouTube? (y/N): ").strip().lower() == "y"
 
     if not TOPIC:
         print("Error: No topic provided.")
         sys.exit(1)
 
-    run_pipeline(TOPIC, upload=upload_flag)
+    # ── Interactive prompts (always asked) ────────────────────────────
+    format_choice = input("Video type - (1) Video [landscape] or (2) Short [portrait]? (1/2): ").strip()
+    format_type = "portrait" if format_choice == "2" else "landscape"
+
+    upload_flag = input("Upload to YouTube? (y/N): ").strip().lower() == "y"
+
+    if upload_flag:
+        privacy_choice = input("Privacy - (1) Public or (2) Private? (1/2): ").strip()
+        privacy = "public" if privacy_choice == "1" else "private"
+    else:
+        privacy = "private"
+
+    run_pipeline(TOPIC, upload=upload_flag, format_type=format_type, privacy=privacy)

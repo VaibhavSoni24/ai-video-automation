@@ -1,18 +1,28 @@
 # AI Video Pipeline
 
-Fully automated **one-trigger → one-video** pipeline. Enter a topic, get a complete YouTube video with voiceover, visuals, subtitles, and thumbnail — ready to upload.
+Fully automated **one-trigger → one-video** pipeline. Enter a topic, get a complete YouTube video or Short with voiceover, visuals, subtitles, and thumbnail — ready to upload.
+
+## Features
+
+- **Landscape Videos** (1920×1080) for regular YouTube uploads
+- **Portrait Videos** (1080×1920) for YouTube Shorts
+- **Interactive prompts** — choose video/short, public/private, and auto-cleanup at runtime
+- **Scene-based visuals** — script is split into scenes, each scene gets a matching stock image
+- **Auto-cleanup** — optionally delete all generated files after successful upload
+- **Public or Private** upload — choose privacy level before uploading
 
 ## Pipeline Steps
 
 | Step | Action | Tool |
 |------|--------|------|
 | 1 | Generate script from topic | Google Gemini API (free) |
-| 2 | Convert script to voiceover | Edge TTS (free) |
-| 3 | Fetch background visuals | Pexels API (free) |
-| 4 | Combine into `.mp4` video | MoviePy + FFmpeg |
-| 5 | Generate & burn subtitles | OpenAI Whisper + FFmpeg |
-| 6 | Create thumbnail | Pillow |
-| 7 | Upload to YouTube | YouTube Data API v3 |
+| 2 | Split script into visual scenes | Google Gemini API |
+| 3 | Convert script to voiceover | Edge TTS (free) |
+| 4 | Fetch background visuals per scene | Pexels API (free) |
+| 5 | Combine into `.mp4` video | MoviePy + FFmpeg |
+| 6 | Generate & burn subtitles | OpenAI Whisper + FFmpeg |
+| 7 | Create thumbnail | Pillow |
+| 8 | Upload to YouTube | YouTube Data API v3 |
 
 ## Project Structure
 
@@ -72,13 +82,20 @@ YOUTUBE_CLIENT_SECRET=your_youtube_client_secret
 python main.py
 ```
 
+You will be prompted for:
+1. **Topic** — Enter your video topic
+2. **Format** — `(1) Video` (landscape 1920×1080) or `(2) Short` (portrait 1080×1920)
+3. **Upload?** — Whether to upload to YouTube
+4. **Privacy** — `(1) Public` or `(2) Private` (only if uploading)
+5. **Cleanup** — Delete generated files after upload? (only if uploading)
+
 ### With CLI arguments
 
 ```bash
-# Generate video only (no upload)
+# Generate video only (no upload) — will still ask format
 python main.py "5 Amazing Facts About Black Holes"
 
-# Generate + upload to YouTube
+# Generate + upload to YouTube — will ask format, privacy, and cleanup
 python main.py "5 Amazing Facts About Black Holes" --upload
 ```
 
@@ -110,6 +127,8 @@ After running the pipeline:
 ## Notes
 
 - First YouTube upload will open a browser for OAuth2 consent (credentials cached in `token.json`)
-- Videos are uploaded as **private** by default — change in the upload step or YouTube Studio
+- **Portrait format** videos are automatically tagged as **#Shorts** on YouTube
+- Choose **public** or **private** privacy when prompted before upload
+- Enable **auto-cleanup** to delete all images, audio, script, and video files after successful upload
 - Whisper subtitle generation requires a one-time model download (~75 MB for `tiny`)
 - All APIs used are **free tier** — be mindful of rate limits

@@ -11,18 +11,33 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def generate_script(topic: str) -> str:
+def generate_script(topic: str, format_type: str = "landscape") -> str:
     """Call Gemini API to generate a short YouTube script."""
-    prompt = (
-        f"Write a 60-90 second YouTube video script.\n"
-        f"Topic: {topic}\n"
-        f"Requirements:\n"
-        f"- Clear, engaging, and educational tone\n"
-        f"- Include a hook in the first 5 seconds\n"
-        f"- Use short sentences suitable for voiceover\n"
-        f"- Do NOT include stage directions, timestamps, or formatting marks\n"
-        f"- Just return the spoken narration text"
-    )
+    if format_type == "portrait":
+        # Shorts: under 60 seconds → ~30-45 second script
+        prompt = (
+            f"Write a 30-45 second YouTube Shorts video script.\n"
+            f"Topic: {topic}\n"
+            f"Requirements:\n"
+            f"- Maximum 30-45 seconds when read aloud\n"
+            f"- Fast-paced, punchy, and attention-grabbing\n"
+            f"- Include a hook in the first 3 seconds\n"
+            f"- Use very short sentences suitable for voiceover\n"
+            f"- Keep it concise — this is a Short, not a full video\n"
+            f"- Do NOT include stage directions, timestamps, or formatting marks\n"
+            f"- Just return the spoken narration text"
+        )
+    else:
+        prompt = (
+            f"Write a 60-90 second YouTube video script.\n"
+            f"Topic: {topic}\n"
+            f"Requirements:\n"
+            f"- Clear, engaging, and educational tone\n"
+            f"- Include a hook in the first 5 seconds\n"
+            f"- Use short sentences suitable for voiceover\n"
+            f"- Do NOT include stage directions, timestamps, or formatting marks\n"
+            f"- Just return the spoken narration text"
+        )
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:

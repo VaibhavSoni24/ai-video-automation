@@ -87,21 +87,34 @@ def upload_video(
     category_id: str = "22",  # People & Blogs
     privacy: str = "private",
     thumbnail_path: str = THUMBNAIL_PATH,
+    is_short: bool = False,
 ) -> str:
     """
     Upload video to YouTube with metadata.
     Returns the video ID on success.
+
+    is_short: If True, adds #Shorts tag for YouTube Shorts
     """
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video not found: {video_path}")
 
     youtube = _get_authenticated_service()
 
+    # Add #Shorts tag if it's a short video
+    final_tags = tags or []
+    if is_short and "Shorts" not in final_tags:
+        final_tags.append("Shorts")
+
+    # Add #Shorts to description if it's a short
+    final_description = description
+    if is_short and "#Shorts" not in final_description:
+        final_description += "\n\n#Shorts"
+
     body = {
         "snippet": {
             "title": title,
-            "description": description,
-            "tags": tags or [],
+            "description": final_description,
+            "tags": final_tags,
             "categoryId": category_id,
         },
         "status": {
