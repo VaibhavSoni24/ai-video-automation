@@ -4,25 +4,27 @@ Fully automated **one-trigger → one-video** pipeline. Enter a topic, get a com
 
 ## Features
 
-- **Landscape Videos** (1920×1080) for regular YouTube uploads
-- **Portrait Videos** (1080×1920) for YouTube Shorts
-- **Interactive prompts** — choose video/short, public/private, and auto-cleanup at runtime
-- **Scene-based visuals** — script is split into scenes, each scene gets a matching stock image
-- **Auto-cleanup** — optionally delete all generated files after successful upload
-- **Public or Private** upload — choose privacy level before uploading
+- **Landscape Videos** (1920×1080, 60-90s) for regular YouTube uploads
+- **Portrait Shorts** (1080×1920, under 60s) for YouTube Shorts
+- **Interactive prompts** — choose video/short, upload, and public/private at runtime
+- **Scene-based visuals** — script is split into scenes, each scene gets a matching stock image from Pexels
+- **Auto-cleanup** — generated files (images, audio, script, SRT) are automatically deleted after the pipeline finishes, keeping only the final subtitled video
+- **Public or Private** upload — choose privacy level before uploading (only asked when uploading)
+- **Smart thumbnails** — auto-generated for landscape videos, skipped for Shorts
 
 ## Pipeline Steps
 
 | Step | Action | Tool |
 |------|--------|------|
-| 1 | Generate script from topic | Google Gemini API (free) |
+| 1 | Generate script (60-90s for video, 30-45s for Shorts) | Google Gemini API (free) |
 | 2 | Split script into visual scenes | Google Gemini API |
-| 3 | Convert script to voiceover | Edge TTS (free) |
-| 4 | Fetch background visuals per scene | Pexels API (free) |
-| 5 | Combine into `.mp4` video | MoviePy + FFmpeg |
-| 6 | Generate & burn subtitles | OpenAI Whisper + FFmpeg |
-| 7 | Create thumbnail | Pillow |
-| 8 | Upload to YouTube | YouTube Data API v3 |
+| 3 | Generate YouTube metadata (title, description, tags) | Google Gemini API |
+| 4 | Convert script to voiceover | Edge TTS (free) |
+| 5 | Fetch background visuals per scene | Pexels API (free) |
+| 6 | Combine into `.mp4` video | MoviePy + FFmpeg |
+| 7 | Generate & burn subtitles | OpenAI Whisper + FFmpeg |
+| 7b | Create thumbnail (landscape only) | Pillow |
+| 8 | Upload to YouTube (optional) | YouTube Data API v3 |
 
 ## Project Structure
 
@@ -86,17 +88,13 @@ You will be prompted for:
 1. **Topic** — Enter your video topic
 2. **Format** — `(1) Video` (landscape 1920×1080) or `(2) Short` (portrait 1080×1920)
 3. **Upload?** — Whether to upload to YouTube
-4. **Privacy** — `(1) Public` or `(2) Private` (only if uploading)
-5. **Cleanup** — Delete generated files after upload? (only if uploading)
+4. **Privacy** — `(1) Public` or `(2) Private` (only asked if uploading)
 
 ### With CLI arguments
 
 ```bash
-# Generate video only (no upload) — will still ask format
+# Pass topic as argument — will still ask format, upload, and privacy
 python main.py "5 Amazing Facts About Black Holes"
-
-# Generate + upload to YouTube — will ask format, privacy, and cleanup
-python main.py "5 Amazing Facts About Black Holes" --upload
 ```
 
 ### Run individual steps
@@ -113,22 +111,20 @@ python -m scripts.upload_youtube     # Upload to YouTube only
 
 ## Output
 
-After running the pipeline:
+After the pipeline completes, all intermediate files are automatically cleaned up.
+Only the final video is kept:
 
 | File | Description |
 |------|-------------|
-| `script.txt` | Generated narration script |
-| `assets/audio/voice.mp3` | AI voiceover |
-| `assets/images/img0-5.jpg` | Background visuals |
-| `assets/video/final.mp4` | Video without subtitles |
-| `assets/video/final_subtitled.mp4` | Video with burned subtitles |
-| `assets/video/thumbnail.jpg` | Auto-generated thumbnail |
+| `assets/video/final_subtitled.mp4` | Final video with burned subtitles |
 
 ## Notes
 
-- First YouTube upload will open a browser for OAuth2 consent (credentials cached in `token.json`)
-- **Portrait format** videos are automatically tagged as **#Shorts** on YouTube
-- Choose **public** or **private** privacy when prompted before upload
-- Enable **auto-cleanup** to delete all images, audio, script, and video files after successful upload
+- First YouTube upload will open a browser for OAuth2 consent (credentials cached in `token.json` for future runs)
+- **Shorts** are automatically kept under 60 seconds with a shorter script (30-45s)
+- **Portrait format** videos are automatically tagged with **#Shorts** on YouTube
+- Choose **public** or **private** privacy when prompted (only if uploading)
+- Thumbnail generation is **skipped for Shorts** (YouTube auto-generates one)
+- All intermediate files (images, audio, script, SRT, thumbnail) are **auto-deleted** after the pipeline — only the final video is preserved
 - Whisper subtitle generation requires a one-time model download (~75 MB for `tiny`)
 - All APIs used are **free tier** — be mindful of rate limits
