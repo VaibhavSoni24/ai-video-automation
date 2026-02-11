@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+assets/images/*
+assets/audio/*
+assets/video/*
+!assets/images/.gitkeep
+!assets/audio/.gitkeep
+!assets/video/.gitkeep
+client_secrets.json
+token.json
+*.srt
+script.txt
