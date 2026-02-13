@@ -32,6 +32,50 @@ from scripts.upload_youtube import upload_video
 import glob
 
 
+def get_inputs():
+    args = sys.argv[1:]
+
+    if len(args) >= 4:
+        topic = args[0]
+        format_choice = args[1].lower()      # "short" or "video"
+        upload_choice = args[2].lower()       # "true" / "false"
+        privacy_choice = args[3].lower()      # "public" / "private"
+
+        upload = upload_choice == "true"
+
+        return {
+            "topic": topic,
+            "format": format_choice,
+            "upload": upload,
+            "privacy": privacy_choice
+        }
+
+    # ---- FALLBACK TO INTERACTIVE MODE ----
+    topic = input("Enter video topic: ")
+
+    format_input = input(
+        "Video type - (1) Video [landscape] or (2) Short [portrait]? (1/2): "
+    )
+    format_choice = "short" if format_input == "2" else "video"
+
+    upload_input = input("Upload to YouTube? (y/N): ").strip().lower()
+    upload = upload_input == "y"
+
+    privacy_choice = "private"
+    if upload:
+        privacy_input = input(
+            "Privacy - (1) Public or (2) Private? (1/2): "
+        )
+        privacy_choice = "public" if privacy_input == "1" else "private"
+
+    return {
+        "topic": topic,
+        "format": format_choice,
+        "upload": upload,
+        "privacy": privacy_choice
+    }
+
+
 def cleanup_generated_files(final_video: str = None):
     """Delete all generated files (images, audio, script, etc.) keeping only the final video."""
     print("\n[Cleanup] Removing generated files...")
@@ -186,27 +230,17 @@ def run_pipeline(
 
 
 if __name__ == "__main__":
-    # ── Get topic from CLI args or prompt ────────────────────────────
-    if len(sys.argv) > 1:
-        args = [a for a in sys.argv[1:] if a != "--upload"]
-        TOPIC = " ".join(args)
-    else:
-        TOPIC = input("Enter video topic: ").strip()
+    inputs = get_inputs()
+    TOPIC = inputs["topic"]
+    FORMAT = inputs["format"]      # "short" or "video"
+    UPLOAD = inputs["upload"]      # True / False
+    PRIVACY = inputs["privacy"]    # "public" / "private"
 
     if not TOPIC:
         print("Error: No topic provided.")
         sys.exit(1)
 
-    # ── Interactive prompts (always asked) ────────────────────────────
-    format_choice = input("Video type - (1) Video [landscape] or (2) Short [portrait]? (1/2): ").strip()
-    format_type = "portrait" if format_choice == "2" else "landscape"
+    # Map format choice to format_type for run_pipeline
+    format_type = "portrait" if FORMAT == "short" else "landscape"
 
-    upload_flag = input("Upload to YouTube? (y/N): ").strip().lower() == "y"
-
-    if upload_flag:
-        privacy_choice = input("Privacy - (1) Public or (2) Private? (1/2): ").strip()
-        privacy = "public" if privacy_choice == "1" else "private"
-    else:
-        privacy = "private"
-
-    run_pipeline(TOPIC, upload=upload_flag, format_type=format_type, privacy=privacy)
+    run_pipeline(TOPIC, upload=UPLOAD, format_type=format_type, privacy=PRIVACY)
