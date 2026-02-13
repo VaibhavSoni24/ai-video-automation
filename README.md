@@ -1,55 +1,34 @@
-# AI Video Pipeline
+# AI-Powered YouTube Automation Pipeline
 
-Fully automated **one-trigger → one-video** pipeline. Enter a topic, get a complete YouTube video or Short with voiceover, visuals, subtitles, and thumbnail — ready to upload.
+Fully automated YouTube content pipeline that generates and uploads videos without manual intervention. Creates daily Shorts and weekly long-form videos using Python, n8n, and free-tier AI tools.
 
 ## Features
 
-- **Landscape Videos** (1920×1080, 60-90s) for regular YouTube uploads
-- **Portrait Shorts** (1080×1920, under 60s) for YouTube Shorts
-- **Interactive prompts** — choose video/short, upload, and public/private at runtime
-- **Scene-based visuals** — script is split into scenes, each scene gets a matching stock image from Pexels
-- **Auto-cleanup** — generated files (images, audio, script, SRT) are automatically deleted after the pipeline finishes, keeping only the final subtitled video
-- **Public or Private** upload — choose privacy level before uploading (only asked when uploading)
-- **Smart thumbnails** — auto-generated for landscape videos, skipped for Shorts
+- 🤖 **Fully Autonomous** - Generates topics, scripts, voiceovers, visuals, subtitles, and thumbnails
+- 📱 **Automated Shorts** - Daily YouTube Shorts (portrait 9:16)
+- 🎬 **Automated Videos** - Weekly long-form content (landscape 16:9)
+- 💰 **Free Tools Only** - Uses Gemini, Edge TTS, Pexels, and Whisper
+- 🔄 **Scheduled Execution** - n8n-based automation with cron scheduling
+- 🧹 **Auto Cleanup** - Isolated run directories with automatic cleanup
 
-## Pipeline Steps
-
-| Step | Action | Tool |
-|------|--------|------|
-| 1 | Generate script (60-90s for video, 30-45s for Shorts) | Google Gemini API (free) |
-| 2 | Split script into visual scenes | Google Gemini API |
-| 3 | Generate YouTube metadata (title, description, tags) | Google Gemini API |
-| 4 | Convert script to voiceover | Edge TTS (free) |
-| 5 | Fetch background visuals per scene | Pexels API (free) |
-| 6 | Combine into `.mp4` video | MoviePy + FFmpeg |
-| 7 | Generate & burn subtitles | OpenAI Whisper + FFmpeg |
-| 7b | Create thumbnail (landscape only) | Pillow |
-| 8 | Upload to YouTube (optional) | YouTube Data API v3 |
-
-## Project Structure
+## How It Works
 
 ```
-ai-video-pipeline/
-├── scripts/
-│   ├── generate_script.py   # Gemini AI script generation
-│   ├── generate_voice.py    # Edge TTS voiceover
-│   ├── fetch_visuals.py     # Pexels image downloader
-│   ├── make_video.py        # MoviePy video composer
-│   ├── subtitles.py         # Whisper STT + FFmpeg subtitle burn
-│   ├── thumbnail.py         # Pillow thumbnail generator
-│   └── upload_youtube.py    # YouTube Data API uploader
-├── assets/
-│   ├── images/              # Downloaded background images
-│   ├── audio/               # Generated voiceover
-│   └── video/               # Final output video
-├── main.py                  # Pipeline orchestrator
-├── requirements.txt
-└── .env                     # API keys (not committed)
+n8n Scheduler → Gemini Topic Generation → Flask API → Python Pipeline → YouTube Upload
 ```
+
+**Pipeline Steps:**
+1. **Script Generation** - AI creates video script (Gemini)
+2. **Voiceover** - Text-to-speech conversion (Edge TTS)
+3. **Visual Fetching** - Scene-based image selection (Pexels)
+4. **Video Composition** - Combine images + audio (MoviePy + FFmpeg)
+5. **Subtitles** - Auto-generate and burn subtitles (Whisper)
+6. **Thumbnail** - Generate thumbnail for videos
+7. **Upload** - Publish to YouTube with metadata (YouTube Data API v3)
 
 ## Setup
 
-### 1. Install Python dependencies
+### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -61,9 +40,9 @@ pip install -r requirements.txt
 - **macOS**: `brew install ffmpeg`
 - **Linux**: `sudo apt install ffmpeg`
 
-### 3. Configure API keys
+### 3. Configure API Keys
 
-Create a `.env` file in the project root:
+Create `.env` file:
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key
@@ -72,59 +51,105 @@ YOUTUBE_CLIENT_ID=your_youtube_client_id
 YOUTUBE_CLIENT_SECRET=your_youtube_client_secret
 ```
 
-- **Gemini API**: Get a free key at [Google AI Studio](https://aistudio.google.com/app/apikey)
-- **Pexels API**: Sign up at [pexels.com/api](https://www.pexels.com/api/)
-- **YouTube API**: Set up OAuth2 credentials in [Google Cloud Console](https://console.cloud.google.com/)
+**Get API Keys:**
+- [Gemini API](https://aistudio.google.com/app/apikey)
+- [Pexels API](https://www.pexels.com/api/)
+- [YouTube API](https://console.cloud.google.com/) (OAuth2 credentials)
+
+### 4. YouTube OAuth
+
+First run opens browser for OAuth2 consent. Credentials cached in `token.json`.
+
+### 5. Setup n8n (Optional - for automation)
+
+```bash
+docker run -d --name n8n -p 5678:5678 -v ~/.n8n:/home/node/.n8n n8nio/n8n
+```
+
+Access at `http://localhost:5678` and import [n8n/YouTube Automation.json](n8n/YouTube%20Automation.json).
 
 ## Usage
 
-### Quick run (interactive)
+### Interactive Mode
 
 ```bash
 python main.py
 ```
 
-You will be prompted for:
-1. **Topic** — Enter your video topic
-2. **Format** — `(1) Video` (landscape 1920×1080) or `(2) Short` (portrait 1080×1920)
-3. **Upload?** — Whether to upload to YouTube
-4. **Privacy** — `(1) Public` or `(2) Private` (only asked if uploading)
+Prompts for topic, format, upload settings, and privacy.
 
-### With CLI arguments
+### CLI Mode
 
 ```bash
-# Pass topic as argument — will still ask format, upload, and privacy
-python main.py "5 Amazing Facts About Black Holes"
+python main.py "Why black holes bend time" short true public
 ```
 
-### Run individual steps
+**Arguments:** `topic`, `format` (short/video), `upload` (true/false), `privacy` (public/private/unlisted)
+
+### API Mode (Automation)
+
+Start server:
 
 ```bash
-python -m scripts.generate_script    # Generate script only
-python -m scripts.generate_voice     # Generate voiceover only
-python -m scripts.fetch_visuals      # Fetch images only
-python -m scripts.make_video         # Create video only
-python -m scripts.subtitles          # Generate subtitles only
-python -m scripts.thumbnail          # Create thumbnail only
-python -m scripts.upload_youtube     # Upload to YouTube only
+python server.py
 ```
 
-## Output
+Make requests:
 
-After the pipeline completes, all intermediate files are automatically cleaned up.
-Only the final video is kept:
+```bash
+curl -X POST http://localhost:5000/run \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"How AI works","format":"short","upload":true,"privacy":"public"}'
+```
 
-| File | Description |
-|------|-------------|
-| `assets/video/final_subtitled.mp4` | Final video with burned subtitles |
+**Response Codes:**
+- `200` - Success
+- `429` - Pipeline busy (thread-locked)
+- `500` - Error
 
-## Notes
+### Full Automation
 
-- First YouTube upload will open a browser for OAuth2 consent (credentials cached in `token.json` for future runs)
-- **Shorts** are automatically kept under 60 seconds with a shorter script (30-45s)
-- **Portrait format** videos are automatically tagged with **#Shorts** on YouTube
-- Choose **public** or **private** privacy when prompted (only if uploading)
-- Thumbnail generation is **skipped for Shorts** (YouTube auto-generates one)
-- All intermediate files (images, audio, script, SRT, thumbnail) are **auto-deleted** after the pipeline — only the final video is preserved
-- Whisper subtitle generation requires a one-time model download (~75 MB for `tiny`)
-- All APIs used are **free tier** — be mindful of rate limits
+1. Start Flask server: `python server.py`
+2. Start n8n: `docker start n8n`
+3. Import workflow from `n8n/YouTube Automation.json`
+4. Configure endpoint: `http://host.docker.internal:5000/run` (Docker) or `http://localhost:5000/run`
+5. Activate workflow
+
+**Schedules:**
+- Daily Shorts: 11:00 PM
+- Weekly Videos: Sunday 11:30 PM
+
+## Project Structure
+
+```
+ai-video-pipeline/
+├── server.py              # Flask API server
+├── main.py                # Pipeline orchestrator
+├── requirements.txt       # Dependencies
+├── scripts/               # Pipeline modules
+│   ├── generate_script.py
+│   ├── generate_voice.py
+│   ├── fetch_visuals.py
+│   ├── make_video.py
+│   ├── subtitles.py
+│   ├── thumbnail.py
+│   └── upload_youtube.py
+├── n8n/                   # Automation workflow
+└── output/                # Final videos
+
+```
+
+## Tech Stack
+
+- **Automation**: n8n
+- **AI**: Google Gemini API
+- **Voiceover**: Edge TTS
+- **Visuals**: Pexels API
+- **Video**: MoviePy + FFmpeg
+- **Subtitles**: Whisper
+- **Upload**: YouTube Data API v3
+- **Backend**: Flask
+
+## License
+
+MIT

@@ -11,3 +11,5 @@ client_secrets.json
 token.json
 *.srt
 script.txt
+runs/
+output/

@@ -16,6 +16,8 @@ Pipeline Steps:
 
 import os
 import sys
+import shutil
+from datetime import datetime
 from dotenv import load_dotenv
 
 # ── Load environment variables ──────────────────────────────────────
@@ -76,46 +78,29 @@ def get_inputs():
     }
 
 
-def cleanup_generated_files(final_video: str = None):
-    """Delete all generated files (images, audio, script, etc.) keeping only the final video."""
+def cleanup_generated_files(run_dir: str = None, final_video: str = None):
+    """Delete all generated files in the run directory, keeping only the final video."""
+    if not run_dir or not os.path.exists(run_dir):
+        return
+    
     print("\n[Cleanup] Removing generated files...")
-
-    # Remove images
-    images_dir = os.path.join("assets", "images")
-    if os.path.exists(images_dir):
-        for file in glob.glob(os.path.join(images_dir, "*.jpg")):
-            os.remove(file)
-            print(f"  Deleted {file}")
-
-    # Remove audio
-    audio_file = os.path.join("assets", "audio", "voice.mp3")
-    if os.path.exists(audio_file):
-        os.remove(audio_file)
-        print(f"  Deleted {audio_file}")
-
-    # Remove script
-    if os.path.exists("script.txt"):
-        os.remove("script.txt")
-        print("  Deleted script.txt")
-
-    # Remove SRT subtitles
-    srt_file = os.path.join("assets", "audio", "voice.srt")
-    if os.path.exists(srt_file):
-        os.remove(srt_file)
-        print(f"  Deleted {srt_file}")
-
-    # Remove intermediate video (without subtitles) and thumbnail, keep final video
-    video_dir = os.path.join("assets", "video")
-    if os.path.exists(video_dir):
-        for file in glob.glob(os.path.join(video_dir, "*.mp4")):
-            if final_video and os.path.abspath(file) == os.path.abspath(final_video):
-                continue  # Keep the final video
-            os.remove(file)
-            print(f"  Deleted {file}")
-        for file in glob.glob(os.path.join(video_dir, "*.jpg")):
-            os.remove(file)
-            print(f"  Deleted {file}")
-
+    
+    # Remove entire run directory except final video
+    if final_video and os.path.exists(final_video):
+        # Move final video to output directory before cleanup
+        output_dir = "output"
+        os.makedirs(output_dir, exist_ok=True)
+        final_output = os.path.join(output_dir, os.path.basename(final_video))
+        shutil.copy2(final_video, final_output)
+        print(f"  Copied final video → {final_output}")
+    
+    # Remove the entire run directory
+    try:
+        shutil.rmtree(run_dir)
+        print(f"  Deleted run directory → {run_dir}")
+    except Exception as e:
+        print(f"  Warning: Could not delete {run_dir}: {e}")
+    
     print("[Cleanup] Done.")
 
 
@@ -127,8 +112,27 @@ def run_pipeline(
 ):
     """Execute the full video-generation pipeline."""
 
+    # Create run-scoped directories with timestamp
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = os.path.join("runs", run_id)
+    
+    audio_dir = os.path.join(run_dir, "audio")
+    video_dir = os.path.join(run_dir, "video")
+    image_dir = os.path.join(run_dir, "images")
+    
+    os.makedirs(audio_dir, exist_ok=True)
+    os.makedirs(video_dir, exist_ok=True)
+    os.makedirs(image_dir, exist_ok=True)
+    
+    # Define file paths for this run
+    script_file = os.path.join(run_dir, "script.txt")
+    audio_file = os.path.join(audio_dir, "voice.mp3")
+    video_file = os.path.join(video_dir, "final.mp4")
+    srt_file = os.path.join(audio_dir, "voice.srt")
+
     print("=" * 60)
     print(f"  AI VIDEO PIPELINE")
+    print(f"  Run ID: {run_id}")
     print(f"  Topic: {topic}")
     print(f"  Format: {format_type.upper()} ({'Shorts' if format_type == 'portrait' else 'Video'})")
     print(f"  Privacy: {privacy.upper()}")
@@ -139,9 +143,9 @@ def run_pipeline(
     script_text = generate_script(topic, format_type=format_type)
 
     # Save script to file
-    with open("script.txt", "w", encoding="utf-8") as f:
+    with open(script_file, "w", encoding="utf-8") as f:
         f.write(script_text)
-    print(f"  Script saved → script.txt ({len(script_text)} chars)")
+    print(f"  Script saved → {script_file} ({len(script_text)} chars)")
 
     # ── Step 2: Split script into visual scenes ─────────────────────
     print("\n[Step 2/8] Splitting script into visual scenes...")
@@ -156,10 +160,12 @@ def run_pipeline(
 
     # ── Step 4: Generate Voiceover ───────────────────────────────────
     print("\n[Step 4/8] Generating voiceover...")
-    make_voice(script_text)
+    make_voice(script_text, output_path=audio_file)
 
     # ── Step 5: Fetch Visuals (one per scene) ────────────────────────
     print("\n[Step 5/8] Fetching visuals from Pexels (per scene)...")
+    # Temporarily change to image_dir for downloads
+    original_images_dir = os.path.join("assets", "images")
     if scenes:
         images = fetch_images_for_scenes(scenes)
     else:
@@ -168,16 +174,35 @@ def run_pipeline(
     if not images:
         print("  WARNING: No images fetched. Using fallback.")
         images = fetch_images("nature landscape")
+    
+    # Move images to run-scoped directory
+    moved_images = []
+    for img in images:
+        if os.path.exists(img):
+            dest = os.path.join(image_dir, os.path.basename(img))
+            shutil.move(img, dest)
+            moved_images.append(dest)
+    images = moved_images
 
     # ── Step 6: Create Video ─────────────────────────────────────────
     print("\n[Step 6/8] Creating video...")
-    video_path = create_video(format_type=format_type)
+    video_path = create_video(
+        images_dir=image_dir,
+        audio_path=audio_file,
+        output_path=video_file,
+        format_type=format_type
+    )
 
     # ── Step 7: Subtitles ────────────────────────────────────────────
     print("\n[Step 7/8] Generating subtitles...")
     try:
-        srt_path = generate_srt()
-        final_video = burn_subtitles(srt_path=srt_path)
+        srt_path = generate_srt(audio_path=audio_file, output_dir=audio_dir)
+        final_video_path = os.path.join(video_dir, "final_subtitled.mp4")
+        final_video = burn_subtitles(
+            video_input=video_file,
+            srt_path=srt_path,
+            video_output=final_video_path
+        )
     except Exception as e:
         print(f"  Subtitle generation failed: {e}")
         print("  Continuing without subtitles...")
@@ -188,7 +213,14 @@ def run_pipeline(
     if format_type == "landscape":
         print("\n[Step 7b] Creating thumbnail...")
         try:
-            thumbnail_path = create_thumbnail(metadata["title"], format_type=format_type)
+            thumb_path = os.path.join(video_dir, "thumbnail.jpg")
+            first_image = images[0] if images else None
+            thumbnail_path = create_thumbnail(
+                metadata["title"],
+                image_path=first_image,
+                output_path=thumb_path,
+                format_type=format_type
+            )
         except Exception as e:
             print(f"  Thumbnail generation failed: {e}")
             thumbnail_path = None
@@ -217,15 +249,16 @@ def run_pipeline(
         print("\n[Step 8/8] Skipping upload.")
 
     # ── Cleanup (always, keep final video) ─────────────────────────
-    cleanup_generated_files(final_video=final_video)
+    cleanup_generated_files(run_dir=run_dir, final_video=final_video)
 
     # ── Done ─────────────────────────────────────────────────────────
+    output_video = os.path.join("output", os.path.basename(final_video))
     print("\n" + "=" * 60)
     print("  PIPELINE COMPLETE")
-    print(f"  Video  → {final_video}")
+    print(f"  Video  → {output_video}")
     if thumbnail_path:
         print(f"  Thumb  → {thumbnail_path}")
-    print(f"  Script → script.txt")
+    print(f"  Run ID → {run_id}")
     print("=" * 60)
 
 
