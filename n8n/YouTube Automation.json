@@ -79,7 +79,7 @@
           "parameters": [
             {
               "name": "key",
-              "value": "AIzaSyByA2gmg32iOHzX9LnxCDZxgc2QLGI_gj0"
+              "value": "YOUR_GEMINI_API_KEY"
             }
           ]
         },
@@ -112,7 +112,7 @@
           "parameters": [
             {
               "name": "key",
-              "value": "AIzaSyByA2gmg32iOHzX9LnxCDZxgc2QLGI_gj0"
+              "value": "YOUR_GEMINI_API_KEY"
             }
           ]
         },

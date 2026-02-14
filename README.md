@@ -68,6 +68,8 @@ docker run -d --name n8n -p 5678:5678 -v ~/.n8n:/home/node/.n8n n8nio/n8n
 
 Access at `http://localhost:5678` and import [n8n/YouTube Automation.json](n8n/YouTube%20Automation.json).
 
+**Important:** After importing the workflow, manually replace `YOUR_GEMINI_API_KEY` with your actual Gemini API key in both the "Short Request" and "Video Request" nodes.
+
 ## Usage
 
 ### Interactive Mode
